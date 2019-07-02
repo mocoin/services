@@ -1,0 +1,820 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: mocoin
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: ${opt:stage}
+  region: ap-northeast-1
+  timeout: 10 # optional, in seconds, default is 6
+
+# you can define service wide environment variables here
+  environment:
+    MONGOLAB_URI: ${env:MONGOLAB_URI_${opt:stage}}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID_${opt:stage}}
+    COGNITO_REGION: ${env:COGNITO_REGION_${opt:stage}}
+    DEBUG: ${env:DEBUG_${opt:stage}}
+    REDIS_HOST: ${env:REDIS_HOST_${opt:stage}}
+    REDIS_KEY: ${env:REDIS_KEY_${opt:stage}}
+    REDIS_PORT: ${env:REDIS_PORT_${opt:stage}}
+    COIN_API_AUTHORIZE_SERVER_DOMAIN: ${env:COIN_API_AUTHORIZE_SERVER_DOMAIN_${opt:stage}}
+    COIN_API_CLIENT_ID: ${env:COIN_API_CLIENT_ID_${opt:stage}}
+    COIN_API_CLIENT_SECRET: ${env:COIN_API_CLIENT_SECRET_${opt:stage}}
+    COIN_API_ENDPOINT: ${env:COIN_API_ENDPOINT_${opt:stage}}
+    BANK_API_AUTHORIZE_SERVER_DOMAIN: ${env:BANK_API_AUTHORIZE_SERVER_DOMAIN_${opt:stage}}
+    BANK_API_CLIENT_ID: ${env:BANK_API_CLIENT_ID_${opt:stage}}
+    BANK_API_CLIENT_SECRET: ${env:BANK_API_CLIENT_SECRET_${opt:stage}}
+    BANK_API_ENDPOINT: ${env:BANK_API_ENDPOINT_${opt:stage}}
+    MOCOIN_TOKEN_SECRET: ${env:MOCOIN_TOKEN_SECRET_${opt:stage}}
+    MOCOIN_TOKEN_ISSUER: ${env:MOCOIN_TOKEN_ISSUER_${opt:stage}}
+
+# you can add statements to the Lambda function's IAM Role here
+#  iamRoleStatements:
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:ListBucket"
+#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:PutObject"
+#      Resource:
+#        Fn::Join:
+#          - ""
+#          - - "arn:aws:s3:::"
+#            - "Ref" : "ServerlessDeploymentBucket"
+#            - "/*"
+
+# you can add packaging information here
+#package:
+#  include:
+#    - include-me.js
+#    - include-me-dir/**
+#  exclude:
+#    - exclude-me.js
+#    - exclude-me-dir/**
+
+custom:
+  adminUserAuth:
+    name: authorizerFunc
+    resultTtlInSeconds: 0
+    identitySource: method.request.header.Authorization
+    # identityValidationExpression: someRegex
+    type: token
+  userAuth:
+    name: authorizerFunc
+    resultTtlInSeconds: 0
+    identitySource: method.request.header.Authorization
+    # identityValidationExpression: someRegex
+    type: token
+    # You must have the documentation object
+  documentation: ${file(./documentation.yml)}
+  commonModelSchemaFragments:
+    # defining common fragments means you can reference them with a single line
+    MethodResponse400:
+      statusCode: 400
+      responseModels:
+        "application/json": ErrorResponse
+    MethodResponse403:
+      statusCode: 403
+      responseModels:
+        "application/json": ErrorResponse
+    MethodResponse404:
+      statusCode: 404
+      responseModels:
+        "application/json": ErrorResponse
+    MethodResponse409:
+      statusCode: 409
+      responseModels:
+        "application/json": ErrorResponse
+    MethodResponse500:
+      statusCode: 500
+      responseModels:
+        "application/json": ErrorResponse
+    MethodResponse503:
+      statusCode: 503
+      responseModels:
+        "application/json": ErrorResponse
+  splitStacks:
+    perFunction: false
+    perType: true
+
+# you can add CloudFormation resource templates here
+# resources:
+#   Resources:
+#    NewResource:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: my-new-bucket
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"
+
+plugins:
+  - serverless-offline
+  - serverless-aws-documentation
+  - serverless-plugin-split-stacks
+
+functions:
+  hello:
+    handler: dst/handler.hello
+    events:
+      - http:
+          path: ""
+          method: get
+          cors: true
+          documentation:
+            summary: hello
+            description: hello
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": HelloResponse
+  openCoinAccount:
+    handler: dst/http/people/me/accounts/coin.open
+    events:
+      - http:
+          path: people/me/accounts/coin
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン口座開設
+            description: ""
+            tags:
+              - コイン口座サービス
+            requestBody:
+              description: 口座番号と口座名義を指定します。サービス内で口座番号がユニークとなるように指定側で管理すること。 重複すればステータスコード409が返されます。
+            requestModels:
+               "application/json": OpenAccountParams
+            methodResponses:
+              -
+                statusCode: 201
+                responseModels:
+                  "application/json": Account
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  closeCoinAccount:
+    handler: dst/http/people/me/accounts/coin.close
+    events:
+      - http:
+          path: people/me/accounts/coin/{accountNumber}/close
+          method: put
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                accountNumber: true
+          documentation:
+            summary: コイン口座解約
+            description: ""
+            tags:
+              - コイン口座サービス
+            # pathParams:
+            #   - name: accountNumber
+            #     description: 口座番号
+            # requestBody:
+            #   description: ""
+            # requestModels:
+            #    "application/json": ModelName
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  searchCoinAccounts:
+    handler: dst/http/people/me/accounts/coin.search
+    events:
+      - http:
+          path: people/me/accounts/coin
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          # request:
+          #   parameters:
+          #     querystrings:
+          #       limit: true
+          documentation:
+            summary: コイン口座検索
+            description: ""
+            tags:
+              - コイン口座サービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AccountList
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  findCoinAccount:
+    handler: dst/http/people/me/accounts/coin.findByAccountNumber
+    events:
+      - http:
+          path: people/me/accounts/coin/{accountNumber}
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                accountNumber: true
+          documentation:
+            summary: コイン口座照会
+            description: ""
+            tags:
+              - コイン口座サービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": Account
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  searchCoinAccountMoneyTransferActions:
+    handler: dst/http/people/me/accounts/coin.searchMoneyTransferActions
+    events:
+      - http:
+          path: people/me/accounts/coin/{accountNumber}/actions/moneyTransfer
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                accountNumber: true
+          documentation:
+            summary: コイン口座取引履歴検索
+            description: ""
+            tags:
+              - コイン口座サービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": MoneyTransferActionList
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  startBuyCoinTransaction:
+    handler: dst/http/transactions/buyCoin.start
+    events:
+      - http:
+          path: transactions/buyCoin/start
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン購入取引開始
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引開始パラメーター
+            requestModels:
+               "application/json": StartTransactionParams
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  confirmBuyCoinTransaction:
+    handler: dst/http/transactions/buyCoin.confirm
+    events:
+      - http:
+          path: transactions/buyCoin/confirm
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン購入取引確定
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引確定パラメーター
+            requestModels:
+               "application/json": ConfirmTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  cancelBuyCoinTransaction:
+    handler: dst/http/transactions/buyCoin.cancel
+    events:
+      - http:
+          path: transactions/buyCoin/cancel
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン購入取引中止
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引中止パラメーター
+            requestModels:
+               "application/json": CancelTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  startReturnCoinTransaction:
+    handler: dst/http/transactions/returnCoin.start
+    events:
+      - http:
+          path: transactions/returnCoin/start
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン返金取引開始
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引開始パラメーター
+            requestModels:
+               "application/json": StartTransactionParams
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  confirmReturnCoinTransaction:
+    handler: dst/http/transactions/returnCoin.confirm
+    events:
+      - http:
+          path: transactions/returnCoin/confirm
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン返金取引確定
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引確定パラメーター
+            requestModels:
+               "application/json": ConfirmTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  cancelReturnCoinTransaction:
+    handler: dst/http/transactions/returnCoin.cancel
+    events:
+      - http:
+          path: transactions/returnCoin/cancel
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン返金取引中止
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引中止パラメーター
+            requestModels:
+               "application/json": CancelTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  startTransferCoinTransaction:
+    handler: dst/http/transactions/transferCoin.start
+    events:
+      - http:
+          path: transactions/transferCoin/start
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン転送取引開始
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引開始パラメーター
+            requestModels:
+               "application/json": StartTransactionParams
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  confirmTransferCoinTransaction:
+    handler: dst/http/transactions/transferCoin.confirm
+    events:
+      - http:
+          path: transactions/transferCoin/confirm
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン転送取引確定
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引確定パラメーター
+            requestModels:
+               "application/json": ConfirmTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  cancelTransferCoinTransaction:
+    handler: dst/http/transactions/transferCoin.cancel
+    events:
+      - http:
+          path: transactions/transferCoin/cancel
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン転送取引中止
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引中止パラメーター
+            requestModels:
+               "application/json": CancelTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  startWithdrawCoinTransaction:
+    handler: dst/http/transactions/withdrawCoin.start
+    events:
+      - http:
+          path: transactions/withdrawCoin/start
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン出金取引開始
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引開始パラメーター
+            requestModels:
+               "application/json": StartTransactionParams
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  confirmWithdrawCoinTransaction:
+    handler: dst/http/transactions/withdrawCoin.confirm
+    events:
+      - http:
+          path: transactions/withdrawCoin/confirm
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン出金取引確定
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引確定パラメーター
+            requestModels:
+               "application/json": ConfirmTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  cancelWithdrawCoinTransaction:
+    handler: dst/http/transactions/withdrawCoin.cancel
+    events:
+      - http:
+          path: transactions/withdrawCoin/cancel
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: コイン出金取引中止
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引中止パラメーター
+            requestModels:
+               "application/json": CancelTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  startDepositCoinTransaction:
+    handler: dst/http/transactions/depositCoin.start
+    events:
+      - http:
+          path: transactions/depositCoin/start
+          method: post
+          cors: true
+          authorizer: ${self:custom.adminUserAuth}
+          documentation:
+            summary: コイン入金取引開始
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引開始パラメーター
+            requestModels:
+               "application/json": StartTransactionParams
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  confirmDepositCoinTransaction:
+    handler: dst/http/transactions/depositCoin.confirm
+    events:
+      - http:
+          path: transactions/depositCoin/confirm
+          method: post
+          cors: true
+          authorizer: ${self:custom.adminUserAuth}
+          documentation:
+            summary: コイン入金取引確定
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引確定パラメーター
+            requestModels:
+               "application/json": ConfirmTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  cancelDepositCoinTransaction:
+    handler: dst/http/transactions/depositCoin.cancel
+    events:
+      - http:
+          path: transactions/depositCoin/cancel
+          method: post
+          cors: true
+          authorizer: ${self:custom.adminUserAuth}
+          documentation:
+            summary: コイン入金取引中止
+            description: ""
+            tags:
+              - コイン取引サービス
+            requestBody:
+              description: 取引中止パラメーター
+            requestModels:
+               "application/json": CancelTransactionParams
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  searchPaymentMethods:
+    handler: dst/http/people/me/paymentMethods.search
+    events:
+      - http:
+          path: people/me/paymentMethods
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: 決済方法検索
+            description: ""
+            tags:
+              - 決済方法サービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  addPaymentMethod:
+    handler: dst/http/people/me/paymentMethods.add
+    events:
+      - http:
+          path: people/me/paymentMethods
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: 決済方法追加
+            description: ""
+            tags:
+              - 決済方法サービス
+            # requestBody:
+            #   description: ""
+            # requestModels:
+            #    "application/json": ModelName
+            methodResponses:
+              -
+                statusCode: 201
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  deletePaymentMethod:
+    handler: dst/http/people/me/paymentMethods.remove
+    events:
+      - http:
+          path: people/me/paymentMethods/{paymentMethodId}
+          method: delete
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                paymentMethodId: true
+          documentation:
+            summary: 決済方法削除
+            description: ""
+            tags:
+              - 決済方法サービス
+            methodResponses:
+              -
+                statusCode: 204
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  openPointAccount:
+    handler: dst/http/people/me/accounts/point.open
+    events:
+      - http:
+          path: people/me/accounts/point
+          method: post
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          documentation:
+            summary: ポイント口座開設
+            description: ""
+            tags:
+              - ポイントサービス
+            requestBody:
+              description: 口座番号と口座名義を指定します。サービス内で口座番号がユニークとなるように指定側で管理すること。 重複すればステータスコード409が返されます。
+            requestModels:
+               "application/json": OpenAccountParams
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": Account
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  closePointAccount:
+    handler: dst/http/people/me/accounts/point.close
+    events:
+      - http:
+          path: people/me/accounts/point/{accountNumber}/close
+          method: put
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                accountNumber: true
+          documentation:
+            summary: ポイント口座解約
+            description: ""
+            tags:
+              - ポイントサービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AnyResponse
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  searchPointAccounts:
+    handler: dst/http/people/me/accounts/point.search
+    events:
+      - http:
+          path: people/me/accounts/point
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          # request:
+          #   parameters:
+          #     querystrings:
+          #       limit: true
+          documentation:
+            summary: ポイント口座検索
+            description: ""
+            tags:
+              - ポイントサービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": AccountList
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  findPointAccount:
+    handler: dst/http/people/me/accounts/point.findByAccountNumber
+    events:
+      - http:
+          path: people/me/accounts/point/{accountNumber}
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                accountNumber: true
+          documentation:
+            summary: ポイント口座照会
+            description: ""
+            tags:
+              - ポイントサービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": Account
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+  searchPointAccountMoneyTransferActions:
+    handler: dst/http/people/me/accounts/point.searchMoneyTransferActions
+    events:
+      - http:
+          path: people/me/accounts/point/{accountNumber}/actions/moneyTransfer
+          method: get
+          cors: true
+          authorizer: ${self:custom.userAuth}
+          request:
+            parameters:
+              paths:
+                accountNumber: true
+          documentation:
+            summary: ポイント口座取引履歴検索
+            description: ""
+            tags:
+              - ポイントサービス
+            methodResponses:
+              -
+                statusCode: 200
+                responseModels:
+                  "application/json": MoneyTransferActionList
+              - ${self:custom.commonModelSchemaFragments.MethodResponse400}
+
+  authorizerFunc:
+    handler: dst/authorizer.handler
+
+#    The following are a few example events you can configure
+#    NOTE: Please make sure to change your handler code to work with those events
+#    Check the event documentation for details
+#    events:
+#      - http:
+#          path: users/create
+#          method: get
+#      - s3: ${env:BUCKET}
+#      - schedule: rate(10 minutes)
+#      - sns: greeter-topic
+#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
+#      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
+#      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
+#      - iot:
+#          sql: "SELECT * FROM 'some_topic'"
+#      - cloudwatchEvent:
+#          event:
+#            source:
+#              - "aws.ec2"
+#            detail-type:
+#              - "EC2 Instance State-change Notification"
+#            detail:
+#              state:
+#                - pending
+#      - cloudwatchLog: '/aws/lambda/hello'
+#      - cognitoUserPool:
+#          pool: MyUserPool
+#          trigger: PreSignUp
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+# you can add CloudFormation resource templates here
+#resources:
+#  Resources:
+#    NewResource:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: my-new-bucket
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"

@@ -1,0 +1,366 @@
+  # this is general info about the API
+  api:
+    info:
+      version: '1.0.0'
+      title: コインサービス
+      description: コインサービスの提供するAPIは、コインを扱うアプリケーションに有用なインターフェースを提供します。
+      termsOfService: https://motionpicture.jp/
+      contact:
+        name: Tetsu Yamazaki
+        url: https://github.com/ilovegadd
+        email: yamazaki@motionpicture.jp
+      license:
+        name: Apache 2.0
+        url: http://www.apache.org/licenses/LICENSE-2.0.html
+      tags:
+      - name: コイン口座サービス
+        description: コイン口座サービス
+      - name: ポイントサービス
+        description: ポイントサービス
+      - name: 決済方法サービス
+        description: 決済方法サービス
+      - name: コイン取引サービス
+        description: コイン取引サービス
+      - name: 管理者サービス
+        description: 管理者サービス
+
+    # securityDefinitions:
+    #   adminAuth:
+    #     type: oauth2
+    #     flow: application
+    #     tokenUrl: https://xxx.auth.ap-northeast-1.amazoncognito.com/oauth2/token
+    # security:
+    #   - adminAuth: []
+
+  # Now we describe all the models that we use
+  models:
+    -
+      name: HelloResponse
+      description: ハローレスポンス
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          message:
+            type: string
+          input: {}
+    -
+      name: AnyResponse
+      description: any
+      contentType: application/json
+      schema: {}
+    -
+      name: ErrorDetail
+      description: 詳細エラー
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          name:
+            type: string
+          reason:
+            type: string
+          message:
+            type: string
+    -
+      name: ErrorResponse
+      description: エラーレスポンス
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          error:
+            type: object
+            properties:
+              message:
+                type: string
+              code:
+                type: integer
+              errors:
+                type: array
+                items:
+                  $ref: "{{model: ErrorDetail}}"
+    -
+      name: Account
+      description: 口座
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          accountType:
+            type: string
+            description: 口座タイプ
+          accountNumber:
+            type: string
+            description: 口座番号
+          name:
+            type: string
+            description: 口座名義
+          balance:
+            type: integer
+            description: 残高
+          availableBalance:
+            type: integer
+            description: 利用可能残高
+        description: 口座
+    -
+      name: AccountList
+      description: 口座リスト
+      contentType: application/json
+      schema:
+        type: array
+        items:
+          $ref: "{{model: Account}}"
+    -
+      name: OpenAccountParams
+      description: 口座開設設定
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          accountNumber:
+            type: string
+            description: 口座番号
+          name:
+            type: string
+            description: 口座名義
+    -
+      name: TransactionType
+      description: >
+        取引タイプ:
+          * `Deposit` - 入金取引タイプ
+          * `Transfer` - 転送取引タイプ
+          * `Withdraw` - 出金取引タイプ
+      contentType: application/json
+      schema:
+        type: string
+        enum:
+        - Deposit
+        - Transfer
+        - Withdraw
+    -
+      name: TransactionStatus
+      description: >
+        取引ステータス:
+          * `InProgress` - 進行中
+          * `Canceled` - 中止済
+          * `Confirmed` - 確定済
+          * `Expired` - 期限切れ
+      contentType: application/json
+      schema:
+        type: string
+        enum:
+        - InProgress
+        - Canceled
+        - Confirmed
+        - Expired
+    -
+      name: TransactionAgent
+      description: 取引進行人
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          typeOf:
+            type: string
+            description: 進行人タイプ
+          id:
+            type: string
+            description: 進行人ID
+          name:
+            type: string
+            description: 進行人名
+          url:
+            type: string
+            description: 進行人URL
+    -
+      name: TransactionRecipient
+      description: 取引受取人
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          typeOf:
+            type: string
+            description: 受取人タイプ
+          id:
+            type: string
+            description: 受取人ID
+          name:
+            type: string
+            description: 受取人名
+          url:
+            type: string
+            description: 受取人URL
+    -
+      name: StartTransactionParams
+      description: 取引開始共通パラメーター
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          expires:
+            type: string
+            format: date-time
+            description: 取引期限
+          agent:
+            $ref: "{{model: TransactionAgent}}"
+          recipient:
+            $ref: "{{model: TransactionRecipient}}"
+          amount:
+            type: integer
+            description: 金額
+          # accountType:
+          #   type: string
+          #   description: 口座タイプ
+          notes:
+            type: string
+            description: 取引説明
+    -
+      name: ConfirmTransactionParams
+      description: 取引確定パラメーター
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          token:
+            type: string
+            description: 取引トークン
+    -
+      name: CancelTransactionParams
+      description: 取引中止パラメーター
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          token:
+            type: string
+            description: 取引トークン
+
+    -
+      name: TransactionAttributes
+      description: 取引共通属性
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          id:
+            type: string
+            description: 取引ID
+          typeOf:
+            $ref: "{{model: TransactionType}}"
+          status:
+            $ref: "{{model: TransactionStatus}}"
+          startDate:
+            type: string
+            format: date-time
+            description: 開始日時
+          endDate:
+            type: string
+            format: date-time
+            description: 終了日時
+          expires:
+            type: string
+            format: date-time
+            description: 確定期限
+          agent:
+            $ref: "{{model: TransactionAgent}}"
+          recipient:
+            $ref: "{{model: TransactionRecipient}}"
+    -
+      name: ClientUser
+      description: 取引進行クライアントユーザー
+      contentType: application/json
+      schema:
+        type: object
+        additionalProperties: true
+      # sub: string;
+      # token_use: string;
+      # scope: string;
+      # scopes: string[];
+      # iss: string;
+      # exp: number;
+      # iat: number;
+      # version: number;
+      # jti: string;
+      # client_id: string;
+      # username?: string;
+    -
+      name: ActionStatusType
+      contentType: application/json
+      definition: アクションステータス
+      schema:
+        type: string
+        enum:
+        - ActiveActionStatus
+        - CompletedActionStatus
+        - FailedActionStatus
+        - PotentialActionStatus
+        - CanceledActionStatus
+    -
+      name: MoneyTransferActionLocation
+      description: 金額保管場所
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          typeOf:
+            type: string
+    -
+      name: Action
+      description: アクション
+      contentType: application/json
+      schema:
+        type: object
+        properties:
+          id:
+            type: string
+            description: アクションID
+          actionStatus:
+            $ref: "{{model: ActionStatusType}}"
+          startDate:
+            type: string
+            format: date-time
+            description: 開始日時
+          endDate:
+            type: string
+            format: date-time
+            description: 終了日時
+    -
+      name: ActionList
+      description: アクションリスト
+      contentType: application/json
+      schema:
+        type: array
+        items:
+          $ref: "{{model: Action}}"
+    -
+      name: MoneyTransferAction
+      description: 金額転送アクション
+      contentType: application/json
+      schema:
+        allOf:
+        - $ref: "{{model: Action}}"
+        - type: object
+          properties:
+            purpose:
+              description: 取引
+              $ref: "{{model: TransactionAttributes}}"
+            amount:
+              type: integer
+              description: 金額
+            fromLocation:
+              description: 転送元
+              $ref: "{{model: MoneyTransferActionLocation}}"
+            toLocation:
+              description: 転送先
+              $ref: "{{model: MoneyTransferActionLocation}}"
+    -
+      name: MoneyTransferActionList
+      description: 金額転送アクションリスト
+      contentType: application/json
+      schema:
+        type: array
+        items:
+          $ref: "{{model: MoneyTransferAction}}"
+

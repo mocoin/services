@@ -1,0 +1,63 @@
+{
+  "name": "mocoin-jobs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dst/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "check": "npm run tslint && nsp check",
+    "clean": "rimraf ./dst ./docs ./coverage \"npm-debug.log*\" ./.nyc_output ./.serverless",
+    "test": "npm run check",
+    "tslint": "tslint --project tsconfig.json -c tslint.json --exclude \"**/*.spec.ts\" \"src/**/*.ts\"",
+    "doc": "echo \"Error: no doc specified\" && exit 0",
+    "preversion": "npm run clean && npm run build && npm test && npm doc",
+    "version": "git add -A",
+    "postversion": "git push origin --tags"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mocoin/services.git"
+  },
+  "author": {
+    "name": "Motionpicture co.,ltd."
+  },
+  "contributors": [
+    {
+      "name": "Tetsu Yamazaki",
+      "email": "yamazaki@motionpicture.jp"
+    }
+  ],
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mocoin/services/issues"
+  },
+  "homepage": "https://github.com/mocoin/services#readme",
+  "dependencies": {
+    "@mocoin/domain": "0.0.0-alpha.19",
+    "debug": "^3.1.0",
+    "http-status": "^1.2.0",
+    "jsonwebtoken": "^8.3.0",
+    "jwk-to-pem": "^2.0.0",
+    "moment": "^2.22.2",
+    "qs": "^6.5.2",
+    "request": "^2.87.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.7",
+    "@types/debug": "0.0.30",
+    "@types/http-status": "^0.2.30",
+    "@types/jsonwebtoken": "^7.2.8",
+    "@types/qs": "^6.5.1",
+    "@types/request": "^2.47.1",
+    "jsonfile": "^4.0.0",
+    "nsp": "^3.2.1",
+    "request-promise-native": "^1.0.5",
+    "rimraf": "^2.6.2",
+    "serverless-aws-documentation": "^1.1.0",
+    "serverless-offline": "^3.25.6",
+    "serverless-plugin-split-stacks": "^1.5.5",
+    "tslint": "^5.10.0",
+    "tslint-microsoft-contrib": "^5.0.3",
+    "typescript": "^2.9.2"
+  }
+}
